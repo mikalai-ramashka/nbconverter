@@ -19,4 +19,9 @@ View
 
     The mapdata.xml file created can be viewed by opening the mapdata.xml in a browser. The stylesheet mapdata.xsl will format it for viewing.
 
+Example
+
+    The example csv file has a set of titles and one data set with the names of the titles as the values. It can be used as sample input to ensure the conversion process is running.
+    The log file will be empty if no errors. The xml file produced will have one row with the titles as data.
+
  
