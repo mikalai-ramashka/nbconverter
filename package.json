@@ -1,0 +1,9 @@
+{
+  "name": "nbconverter",
+  "description": "Converts Nationbuilder export to specific data file format",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "csvtojson": "*"
+  }
+}
