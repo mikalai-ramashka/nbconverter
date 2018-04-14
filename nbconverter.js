@@ -27,7 +27,9 @@ if (args.length != 1) {
     console.log("Usage:", process.argv[0], " csv-filename");
     process.exit(0);
 }
-var existingMapDataFile = "mapdata.json";
+
+// no longer need to merge this file, as the new csv format 
+// var existingMapDataFile = "mapdata.json";
 
 var inputfile = args[0];
 var outputfile = "mapdata.xml";
@@ -41,35 +43,11 @@ var map = new Map();
 var nameToId = new Map();
 var Converter = require("csvtojson").Converter;
 var converter = new Converter({});
-
-var content = fs.readFileSync(existingMapDataFile);
-var existingMapData = JSON.parse(content);
-var existingNBIDToData = new Map();
-var members = existingMapData.markers.marker;
-for (var i = 0; i < members.length; i++) {
-    var m = members[i];
-    if (m.nbid) {
-        existingNBIDToData[m.nbid.$t] = m;
-    } else {
-        log("Warning existing map data missing NBID for == ", m.name);
-    }
-}
 var missingCount = 0;
 
 function xmlit(tag, content) {
     var c = (content ? content.replace(/&/g, '&amp;') : "");
     return "    <" + tag + ">" + c + "</" + tag + ">";
-}
-
-function getDataFromJSONObject(obj) {
-    if (obj == undefined) return undefined;
-    if (dataForField.$t) {
-        return dataForField.$t;
-    }
-    if (dataForField.$cd) {
-        return dataForField.$cd;
-    }
-    return "";
 }
 
 var noNBDataExpected = {
@@ -83,30 +61,11 @@ function generateTag(obj, xmlField, nationBuilderField) {
     var nationbuilderdata = obj[nationBuilderField];
     if (nationbuilderdata == undefined) {
         var nbid = obj.nationbuilder_id;
-        var existingdata = existingNBIDToData[nbid];
-        if (existingdata) {
-            var header = "Missing data: " + existingdata.name.$t + " Nationbuilder ID: " + nbid;
-            var msg = "Mapdata: '" +
+        var msg = "Mapdata: '" +
                 xmlField +
                 "' CSV: '" +
                 nationBuilderField + "'.";
-
-            var dataForField = existingdata[xmlField];
-            if (dataForField) {
-                if (dataForField.$t) { // text 
-                    nationbuilderdata = dataForField.$t;
-                    msg = msg + " Used existing mapdata ->  " + nationbuilderdata;
-                } else
-                if (dataForField.$cd) { // CDATA 
-                    nationbuilderdata = "<![CDATA[" + dataForField.$cd + "]]>";
-                    msg = msg + " Used existing mapdata -> CDATA text";
-                } else {
-                    nationbuilderdata = "";
-                    msg = msg + " (Existing mapdata empty)";
-                }
-                //      log(xmlField, " was being populated from existing xml data");
-
-            } else {
+ 
                 var excludes = noNBDataExpected[obj.orgtype];
 
                 if (excludes && !excludes.includes(xmlField)) {
@@ -116,8 +75,8 @@ function generateTag(obj, xmlField, nationBuilderField) {
                     msg = undefined;
                 }
                 nationbuilderdata = "";
-            }
-        }
+            //}
+        //}
     }
     if (msg) {
         if (obj.showHeader) {
@@ -171,6 +130,10 @@ function outputLog() {
     });
 }
 
+function getFarmType(type) {
+    // foodservice, producer, retailers, markets
+}
+
 var xmlTagToNBName = {
     "name": "full_name",
     "nbid": "nationbuilder_id",
@@ -178,11 +141,11 @@ var xmlTagToNBName = {
     "lng": "lng",
     "orgtype": "orgtype",
     "savour": "membership",
-    "farmtypes": "farmtypes",
-    "favorites": "favorites",
-    "productiontypes": "productiontypes",
-    "infowindow": "infowindow",
-    "email": "email",
+    "farmtypes": "farmtypes",  // 
+    "favorites": "favorites",  // things produced, fruit, vegetable, meat, etc
+    "productiontypes": "productiontypes",  // conventional, eco_practices, certified_organic
+    "infowindow": "infowindow",  // compilation of name, address, email, phone
+    "email": "email", 
     "website": "website",
     "icon": "icon"
 };
@@ -195,6 +158,7 @@ function getGetcodeData(address) {
         });
     }
 }
+
 converter.fromFile(inputfile, function(err, jsonArray) {
     for (var i = 0, l = jsonArray.length; i < l; i++) {
         var obj = jsonArray[i];
@@ -202,14 +166,14 @@ converter.fromFile(inputfile, function(err, jsonArray) {
         var xmltags = Object.keys(xmlTagToNBName);
         obj.showHeader = true;
 
-        if (obj.primary_address1) {
-            getGetcodeData(obj.primary_address1);
+        if (obj.address_address1) {
+            getGetcodeData(obj.address_address1);
         }
 
         xmltags.forEach(function callback(xmlkey, index, array) {
             output(generateTag(obj, xmlkey, xmlTagToNBName[xmlkey]));
         });
-        output("</marker>");
+        output("</marker>\n");
     }
     outputXML();
     outputLog();
