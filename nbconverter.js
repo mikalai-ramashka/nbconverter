@@ -1,25 +1,5 @@
 var fs = require('fs');
 
-var NodeGeocoder = require('node-geocoder');
-
-var options = {
-    provider: 'google',
-    // Optional depending on the providers 
-    httpAdapter: 'https', // Default 
-    apiKey: process.env.NB_API_KEY, // for Mapquest, OpenCage, Google Premier 
-    formatter: null // 'gpx', 'string', ... 
-};
-
-
-var geocoder = null;
-
-if (process.env.NB_API_KEY) {
-    console.log("API Key found, will attempt to geocode locations.")
-    geocoder = NodeGeocoder(options);
-} else {
-    console.log("No API Key (NB_API_KEY) found, not attempting to geocode locations.")
-}
-
 var args = process.argv.splice(2);
 
 if (args.length != 1) {
@@ -34,10 +14,17 @@ if (args.length != 1) {
 var inputfile = args[0];
 var outputfile = "mapdata.xml";
 var logfile = outputfile + '.log';
+var autolatlong = "autolatlong.json";
+var manuallatlong = "manuallatlong.json";
 
 console.log("Input File ", inputfile);
 console.log("Outputfile File ", outputfile);
 console.log("Logfile File ", logfile);
+console.log("autolatlong File ", autolatlong);
+console.log("manuallatlong File ", manuallatlong);
+
+
+
 
 var map = new Map();
 var nameToId = new Map();
@@ -62,20 +49,20 @@ function generateTag(obj, xmlField, nationBuilderField) {
     if (nationbuilderdata == undefined) {
         var nbid = obj.nationbuilder_id;
         var msg = "Mapdata: '" +
-                xmlField +
-                "' CSV: '" +
-                nationBuilderField + "'.";
- 
-                var excludes = noNBDataExpected[obj.orgtype];
+            xmlField +
+            "' CSV: '" +
+            nationBuilderField + "'.";
 
-                if (excludes && !excludes.includes(xmlField)) {
-                    msg = msg + "No Update Found";
-                    // log(JSON.stringify(existingdata, 4));
-                } else {
-                    msg = undefined;
-                }
-                nationbuilderdata = "";
-            //}
+        var excludes = noNBDataExpected[obj.orgtype];
+
+        if (excludes && !excludes.includes(xmlField)) {
+            msg = msg + "No Update Found";
+            // log(JSON.stringify(existingdata, 4));
+        } else {
+            msg = undefined;
+        }
+        nationbuilderdata = "";
+        //}
         //}
     }
     if (msg) {
@@ -99,7 +86,6 @@ var logoutput = [];
 function log(line) {
     logoutput.push(line);
 }
-
 
 function outputXML() {
     console.log("Creating: ", outputfile);
@@ -141,23 +127,20 @@ var xmlTagToNBName = {
     "lng": "lng",
     "orgtype": "orgtype",
     "savour": "membership",
-    "farmtypes": "farmtypes",  // 
-    "favorites": "favorites",  // things produced, fruit, vegetable, meat, etc
-    "productiontypes": "productiontypes",  // conventional, eco_practices, certified_organic
-    "infowindow": "infowindow",  // compilation of name, address, email, phone
-    "email": "email", 
+    "farmtypes": "farmtypes", // 
+    "favorites": "favorites", // things produced, fruit, vegetable, meat, etc
+    "productiontypes": "productiontypes", // conventional, eco_practices, certified_organic
+    "infowindow": "infowindow", // compilation of name, address, email, phone
+    "email": "email",
     "website": "website",
     "icon": "icon"
 };
 
-function getGetcodeData(address) {
-    if (geocoder) {
-        geocoder.geocode(address, function(err, res) {
-            console.log("Returned Data for GPS FOR  =", address);
-            console.log(res);
-        });
-    }
-}
+var content = fs.readFileSync(autolatlong);
+var latlongmap = JSON.parse(content);
+var content = fs.readFileSync(manuallatlong);
+var manlatlongmap = JSON.parse(content);
+for (var field in manlatlongmap) { latlongmap[field] = manlatlongmap[field]; }
 
 converter.fromFile(inputfile, function(err, jsonArray) {
     for (var i = 0, l = jsonArray.length; i < l; i++) {
@@ -166,9 +149,19 @@ converter.fromFile(inputfile, function(err, jsonArray) {
         var xmltags = Object.keys(xmlTagToNBName);
         obj.showHeader = true;
 
-        if (obj.address_address1) {
-            getGetcodeData(obj.address_address1);
+        var existing = latlongmap[String(obj.nationbuilder_id)];
+        if (existing) {
+            console.log("Using Existing lat/lng for NBID ", obj.nationbuilder_id, existing)
+            if (existing.lat) {
+                obj['lat'] = existing.lat;
+            }
+            if (existing.lng) {
+                obj['lng'] = existing.lng;
+            }
+        } else {
+            console.log("No Known LAT for NBID ", obj.nationbuilder_id)
         }
+
 
         xmltags.forEach(function callback(xmlkey, index, array) {
             output(generateTag(obj, xmlkey, xmlTagToNBName[xmlkey]));
