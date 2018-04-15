@@ -2,7 +2,7 @@ var fs = require('fs');
 
 var NodeGeocoder = require('node-geocoder');
 
-var content = fs.readFileSync('cachedgoogle');
+var content = fs.readFileSync('cachedgoogle.json');
 var cachedgoogle = JSON.parse(content);
 
 function cachedGeocode(obj, callback) {
