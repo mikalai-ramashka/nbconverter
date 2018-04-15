@@ -1,4 +1,16 @@
+var fs = require('fs');
+
 var NodeGeocoder = require('node-geocoder');
+
+var content = fs.readFileSync('cachedgoogle');
+var cachedgoogle = JSON.parse(content);
+
+function cachedGeocode(obj, callback) {
+    if (cachedgoogle[obj]) {
+        return callback(undefined, cachedgoogle[obj]);
+    }
+    return callback("Error no cache for " + obj, undefined);
+}
 
 var options = {
     provider: 'google',
@@ -8,83 +20,165 @@ var options = {
     formatter: null // 'gpx', 'string', ... 
 };
 
-var geocoder = NodeGeocoder(options);
+var geocoder = null;
+if (process.env.NB_API_KEY) {
+    console.log("API Key found, will attempt to geocode locations.")
+    geocoder = NodeGeocoder(options);
+} else {
+    console.log("No API Key (NB_API_KEY) found, not attempting to geocode locations.")
+    geocoder = new Object();
+    geocoder.geocode = cachedGeocode;
+}
 
-// Using callback 
-geocoder.geocode('29 champs elysée paris', function(err, res) {
-    console.log(res);
-});
+var args = process.argv.splice(2);
 
-// Or using Promise 
-geocoder.geocode('29 champs elysée paris')
-    .then(function(res) {
-        console.log(res);
-    })
-    .catch(function(err) {
-        console.log(err);
+if (args.length != 1) {
+    console.log("You must pass a file name to find GPS coords as the first parameter.");
+    console.log("Usage:", process.argv[0], " csv-filename");
+    process.exit(0);
+}
+
+var inputfile = args[0];
+var outputfile = "autolatlong.json";
+var logfile = outputfile + '.log';
+
+console.log("Input File ", inputfile);
+console.log("Outputfile File ", outputfile);
+console.log("Logfile File ", logfile);
+
+var map = new Map();
+var nameToId = new Map();
+var Converter = require("csvtojson").Converter;
+var converter = new Converter({});
+
+var outputLines = [];
+
+function output(line) {
+    outputLines.push(line);
+}
+var logoutput = [];
+
+function log(line) {
+    logoutput.push(line);
+}
+
+function outputLatLong() {
+    console.log("Creating: ", outputfile);
+    var stream = fs.createWriteStream(outputfile);
+    stream.once('open', function(fd) {
+
+        stream.write("{\n");
+        for (var i = 0; i < outputLines.length; i++) {
+            stream.write('\n');
+            stream.write(outputLines[i]);
+            if (i != (outputLines.length - 1)) stream.write(',');
+        }
+        stream.write("}\n");
+        stream.end();
     });
+}
 
-// output : 
-[{
-    latitude: 48.8698679,
-    longitude: 2.3072976,
-    country: 'France',
-    countryCode: 'FR',
-    city: 'Paris',
-    zipcode: '75008',
-    streetName: 'Champs-Élysées',
-    streetNumber: '29',
-    administrativeLevels: {
-        level1long: 'Île-de-France',
-        level1short: 'IDF',
-        level2long: 'Paris',
-        level2short: '75'
-    },
-    provider: 'google'
-}]
-
-geocoder.geocode({ address: '29 champs elysée', country: 'France', zipcode: '75008' }, function(err, res) {
-    console.log(res);
-});
-
-// OpenCage advanced usage example 
-geocoder.geocode({ address: '29 champs elysée', countryCode: 'fr', minConfidence: 0.5, limit: 5 }, function(err, res) {
-    console.log(res);
-});
-
-// Reverse example 
-
-// Using callback 
-geocoder.reverse({ lat: 45.767, lon: 4.833 }, function(err, res) {
-    console.log(res);
-});
-
-// Or using Promise 
-geocoder.reverse({ lat: 45.767, lon: 4.833 })
-    .then(function(res) {
-        console.log(res);
-    })
-    .catch(function(err) {
-        console.log(err);
+function outputLog() {
+    console.log("Creating: ", logfile);
+    var stream = fs.createWriteStream(logfile);
+    stream.once('open', function(fd) {
+        for (var i = 0; i < logoutput.length; i++) {
+            stream.write(logoutput[i]);
+            stream.write("\n");
+        }
+        stream.end();
     });
+}
 
-// Batch geocode 
+var failed = 0;
+var success = 0;
+var failedFiltered = 0;
+var successFiltered = 0;
 
-geocoder.batchGeocode(['13 rue sainte catherine', 'another adress'], function(err, results) {
-    // Return an array of type {error: false, value: []} 
-    console.log(results);
-});
+function printStats() {
+    console.log("Geocoder Success Finding some Addresses for  = " + success);
+    console.log("Geocoder Success to filtered(Canadian)Address for  = " + successFiltered);
+    console.log("Geocoder Failed to filtered(Canadian)Address for  = " + failedFiltered);
+    console.log("Geocoder Failed to find Any Address  = " + failed);
+}
 
-// Set specific http request headers: 
-var HttpsAdapter = require('node-geocoder/lib/httpadapter/httpsadapter.js')
-var httpAdapter = new HttpsAdapter(null, {
-    headers: {
-        'user-agent': 'Find geo location  <email@domain.com>',
-        'X-Specific-Header': 'Specific value'
+function getFullAddress(entry, delimiter) {
+    var fullAddress = "";
+    var delim = "";
+    if (entry.primary_address1) {
+        fullAddress = fullAddress + delim + entry.primary_address1;
+        delim = delimiter;
     }
-});
+    if (entry.primary_city) {
+        fullAddress = fullAddress + delim + entry.primary_city;
+        delim = delimiter;
+    }
+    if (entry.primary_state) {
+        fullAddress = fullAddress + delim + entry.primary_state;
+        delim = delimiter;
+    }
+    if (entry.primary_country_code) {
+        fullAddress = fullAddress + delim + entry.primary_country_code;
+        delim = delimiter;
+    }
+    if (entry.primary_zip) {
+        fullAddress = fullAddress + delim + entry.primary_zip;
+    }
+    return fullAddress;
+}
 
-var geocoder = NodeGeocoder({
-    provider: 'google',
-    httpAdapter: httpAdapter
+
+function getGetcodeData(obj, lastCall) {
+    var address = getFullAddress(obj, ", ");
+    if (geocoder) {
+        geocoder.geocode(address, function(err, res) {
+            if (err) {
+                log('Geocoder FAILED for: "' + address + '"');
+                failed++;
+            } else {
+                success++;
+
+                log('Geocoder Succeeded for  = "' + address + '"');
+                log(JSON.stringify(res));
+
+                var filtered = res.filter(function(e) { return e.countryCode == 'CA' });
+                if (filtered.length == 0) {
+                    failedFiltered++;
+                    log('Geocoder Failed (Canadian Address) for: "' + address + '"');
+                } else {
+                    successFiltered++;
+                    var canadian = filtered[0];
+                    // console.log(JSON.stringify(canadian));
+                    log('Geocoder Succeeded (Canadian Address) for: "' + address + '"');
+                    console.log("Geocoder Success for Canadian Address for  = ", address);
+                    console.log("Geocoder Success CANADIAN NBID for  =", obj.nationbuilder_id);
+                    var data = new Object();
+                    data[obj.nationbuilder_id] = {
+                        'lat': canadian.latitude,
+                        'lng': canadian.longitude,
+                        'fullAddress': address
+                    }
+                    output(JSON.stringify(data));
+                }
+            }
+            lastCall();
+        });
+    }
+}
+
+function allCallsDone() {
+    outputLatLong();
+    outputLog();
+    printStats();
+}
+converter.fromFile(inputfile, function(err, jsonArray) {
+    var callbacks = 0;
+    var end = jsonArray.length;
+    var cb = function() {
+        callbacks++;
+        if (callbacks == end) allCallsDone();
+    }
+    for (var i = 0, l = jsonArray.length; i < l; i++) {
+        getGetcodeData(jsonArray[i], cb);
+    }
 });
