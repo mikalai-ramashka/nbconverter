@@ -23,9 +23,6 @@ console.log("Logfile File ", logfile);
 console.log("autolatlong File ", autolatlong);
 console.log("manuallatlong File ", manuallatlong);
 
-
-
-
 var map = new Map();
 var nameToId = new Map();
 var Converter = require("csvtojson").Converter;
@@ -43,35 +40,25 @@ var noNBDataExpected = {
     "producer": ['icon']
 }
 
-function generateTag(obj, xmlField, nationBuilderField) {
-
-    var nationbuilderdata = obj[nationBuilderField];
+function generateTag(obj, xmlField, nationBuilderFieldOrFunction) {
+    var nationbuilderdata = "";
+    if (typeof nationBuilderFieldOrFunction == 'function') {
+        nationbuilderdata = nationBuilderFieldOrFunction(obj);
+    } else {
+        nationbuilderdata = obj[nationBuilderFieldOrFunction]; 
+    }
+     
     if (nationbuilderdata == undefined) {
         var nbid = obj.nationbuilder_id;
-        var msg = "Mapdata: '" +
-            xmlField +
-            "' CSV: '" +
-            nationBuilderField + "'.";
-
-        var excludes = noNBDataExpected[obj.orgtype];
-
-        if (excludes && !excludes.includes(xmlField)) {
-            msg = msg + "No Update Found";
-            // log(JSON.stringify(existingdata, 4));
-        } else {
-            msg = undefined;
-        }
         nationbuilderdata = "";
-        //}
-        //}
     }
-    if (msg) {
-        if (obj.showHeader) {
-            log(String(missingCount++) + ": " + header);
-            obj.showHeader = false;
-        }
-        log("   " + msg);
-    }
+    // if (msg) {
+    //     if (obj.showHeader) {
+    //         log(String(missingCount++) + ": " + header);
+    //         obj.showHeader = false;
+    //     }
+    //     log("   " + msg);
+    // }
     return xmlit(xmlField, nationbuilderdata);
 }
 
@@ -116,8 +103,135 @@ function outputLog() {
     });
 }
 
-function getFarmType(type) {
-    // foodservice, producer, retailers, markets
+function getOrgType(entry) {
+    // Basis for choosing map icon (need an icon for each of these maptypes)
+    // 1 row in csv file can be 1 or more of the following:
+    // foodservice, producer, retailer, market, microprocessor, breweries_and_wineries
+    if (entry.retailers) {
+        return "retailers";
+    } else if (entry.markets) {
+        return "markets";
+    } else if (entry.foodservice) {
+        return "foodservice";
+    } else if (entry.microprocessor) {
+        return "microprocessor";
+    } else if (entry.breweries_and_wineries) {
+        return "breweries_and_wineries";
+    } 
+    return "producer";
+}
+
+function getFarmType(entry) {  
+    // applies to producers, 1 or more: csa, pick-your-own
+    var farmtype = "";
+    if (entry.pick_your_own == 'true') {
+        farmtype = farmtype + ",pick_your_own";
+    } else if (entry.csa == 'true') {
+        farmtype = farmtype + ",pick_your_own";
+    }
+    return farmtype.substring(1); 
+}
+
+function getProductsList(entry) {
+    // if maptype is producer, they can produce 0 or more of the following products:
+    // fruits, vegetables, grains_seeds, meat, poultry_eggs, sweeteners, herb_grower
+    var products = "";
+    if (entry.vegetables == 'true') {
+        products = products + ",fv-vegetables"
+    } 
+    if (entry.fruits == 'true') {
+        products = products + ",fv-fruits"
+    }  
+    if (entry.grains_seeds == 'true') {
+        products = products + ",fv-grains_seeds"
+    }  
+    if (entry.meat == 'true') {
+        products = products + ",fm-meat"
+    }  
+    if (entry.poultry_eggs == 'true') {
+        products = products + ",fm-poultry_eggs"
+    }  
+    if (entry.sweeteners == 'true') {
+        products = products + ",fv-sweeteners"
+    }  
+    if (entry.herb_grower == 'true') {
+        products = products + ",fv-herbs"
+    } 
+    return products.substring(1); 
+}
+
+function getProductionPractice(entry) {
+    // if maptype is producer, 1 row in csv file can only be 1 of the following:
+    // eco, cert_org, conventional
+    if (entry.certified_organic == 'true') {
+        return "certified_organic";
+    } else if (entry.self_identified_ecological_practises == 'true') {
+        return "self_identified_ecological";
+    } 
+    return "conventional";
+}
+
+function getPurchaseType(entry) {
+    // buyonline, farmstand, 0 or more
+    // this information was not previously available buyonline applies to all maptypes
+    var purchaseType = "";
+
+    if (entry.buy_online == 'true') {
+        purchaseType = purchaseType + ",buy_online";
+    }
+    if (entry.farm_stand == 'true') {
+        purchaseType = purchaseType + ",farm_stand";
+    }
+    return purchaseType.substring(1); 
+}
+
+function getSOMembership(entry) {
+    if (entry.membership == 'true') {
+        return true;
+    }
+    return false;
+}
+
+function getFullAddress(entry, delimiter) {
+    var fullAddress = "";
+    if (entry.primary_address1) {
+        fullAddress = fullAddress + entry.primary_address1 + delimiter;
+    }
+    if (entry.primary_city) {
+        fullAddress = fullAddress + entry.primary_city + delimiter;
+    }
+    if (entry.primary_state) {
+        fullAddress = fullAddress + entry.primary_state + delimiter;
+    }
+    if (entry.primary_country_code) {
+        fullAddress = fullAddress + entry.primary_country_code + delimiter;
+    }
+    if (entry.primary_zip) {
+        fullAddress = fullAddress + entry.primary_zip;
+    }
+    return fullAddress;
+}
+
+function getInfoWindow(entry) {
+    var details = "<![CDATA[";
+    if (entry.full_name) {
+        details = details + "name: " + entry.full_name;
+    }
+    details = details + getFullAddress(entry, ", ");
+    if (entry.email) {
+        details = details + "\nemail: " + entry.email;
+    }
+    if (entry.website) {
+        details = details + "\nwebsite: " + entry.website;
+    }
+    if (entry.phone_number) {
+        details = details + "\nphone: " + entry.phone_number;
+    }
+    if (entry.twitter_login) {
+        details = details + "\ntwitter: " + entry.twitter_login;
+    }
+    details = details + "]]>";
+    return details;
 }
 
 var xmlTagToNBName = {
@@ -125,15 +239,16 @@ var xmlTagToNBName = {
     "nbid": "nationbuilder_id",
     "lat": "lat",
     "lng": "lng",
-    "orgtype": "orgtype",
-    "savour": "membership",
-    "farmtypes": "farmtypes", // 
-    "favorites": "favorites", // things produced, fruit, vegetable, meat, etc
-    "productiontypes": "productiontypes", // conventional, eco_practices, certified_organic
-    "infowindow": "infowindow", // compilation of name, address, email, phone
+    "orgtype": getOrgType,  
+    "savour": getSOMembership,  
+    "farmtypes": getFarmType, 
+    "favorites": getProductsList, 
+    "productiontypes": getProductionPractice, 
+    "purchasetypes": getPurchaseType,  
+    "infowindow": getInfoWindow, 
     "email": "email",
     "website": "website",
-    "icon": "icon"
+    "icon": "icon"  
 };
 
 var content = fs.readFileSync(autolatlong);
