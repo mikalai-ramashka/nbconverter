@@ -30,6 +30,7 @@ var converter = new Converter({});
 var missingCount = 0;
 
 function xmlit(tag, content) {
+    content = String(content);
     var c = (content ? content.replace(/&/g, '&amp;') : "");
     return "    <" + tag + ">" + c + "</" + tag + ">";
 }
@@ -45,9 +46,9 @@ function generateTag(obj, xmlField, nationBuilderFieldOrFunction) {
     if (typeof nationBuilderFieldOrFunction == 'function') {
         nationbuilderdata = nationBuilderFieldOrFunction(obj);
     } else {
-        nationbuilderdata = obj[nationBuilderFieldOrFunction]; 
+        nationbuilderdata = obj[nationBuilderFieldOrFunction];
     }
-     
+
     if (nationbuilderdata == undefined) {
         var nbid = obj.nationbuilder_id;
         nationbuilderdata = "";
@@ -117,11 +118,11 @@ function getOrgType(entry) {
         return "microprocessor";
     } else if (entry.breweries_and_wineries) {
         return "breweries_and_wineries";
-    } 
+    }
     return "producer";
 }
 
-function getFarmType(entry) {  
+function getFarmType(entry) {
     // applies to producers, 1 or more: csa, pick-your-own
     var farmtype = "";
     if (entry.pick_your_own == 'true') {
@@ -129,7 +130,7 @@ function getFarmType(entry) {
     } else if (entry.csa == 'true') {
         farmtype = farmtype + ",pick_your_own";
     }
-    return farmtype.substring(1); 
+    return farmtype.substring(1);
 }
 
 function getProductsList(entry) {
@@ -138,26 +139,26 @@ function getProductsList(entry) {
     var products = "";
     if (entry.vegetables == 'true') {
         products = products + ",fv-vegetables"
-    } 
+    }
     if (entry.fruits == 'true') {
         products = products + ",fv-fruits"
-    }  
+    }
     if (entry.grains_seeds == 'true') {
         products = products + ",fv-grains_seeds"
-    }  
+    }
     if (entry.meat == 'true') {
         products = products + ",fm-meat"
-    }  
+    }
     if (entry.poultry_eggs == 'true') {
         products = products + ",fm-poultry_eggs"
-    }  
+    }
     if (entry.sweeteners == 'true') {
         products = products + ",fv-sweeteners"
-    }  
+    }
     if (entry.herb_grower == 'true') {
         products = products + ",fv-herbs"
-    } 
-    return products.substring(1); 
+    }
+    return products.substring(1);
 }
 
 function getProductionPractice(entry) {
@@ -167,7 +168,7 @@ function getProductionPractice(entry) {
         return "certified_organic";
     } else if (entry.self_identified_ecological_practises == 'true') {
         return "self_identified_ecological";
-    } 
+    }
     return "conventional";
 }
 
@@ -182,7 +183,7 @@ function getPurchaseType(entry) {
     if (entry.farm_stand == 'true') {
         purchaseType = purchaseType + ",farm_stand";
     }
-    return purchaseType.substring(1); 
+    return purchaseType.substring(1);
 }
 
 function getSOMembership(entry) {
@@ -215,7 +216,7 @@ function getFullAddress(entry, delimiter) {
         fullAddress = fullAddress + delim + entry.primary_zip;
     }
     return fullAddress;
- }
+}
 
 function getInfoWindow(entry) {
     var details = "<![CDATA[";
@@ -244,16 +245,16 @@ var xmlTagToNBName = {
     "nbid": "nationbuilder_id",
     "lat": "lat",
     "lng": "lng",
-    "orgtype": getOrgType,  
-    "savour": getSOMembership,  
-    "farmtypes": getFarmType, 
-    "favorites": getProductsList, 
-    "productiontypes": getProductionPractice, 
-    "purchasetypes": getPurchaseType,  
-    "infowindow": getInfoWindow, 
+    "orgtype": getOrgType,
+    "savour": getSOMembership,
+    "farmtypes": getFarmType,
+    "favorites": getProductsList,
+    "productiontypes": getProductionPractice,
+    "purchasetypes": getPurchaseType,
+    "infowindow": getInfoWindow,
     "email": "email",
     "website": "website",
-    "icon": "icon"  
+    "icon": "icon"
 };
 
 var content = fs.readFileSync(autolatlong);
