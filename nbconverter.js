@@ -194,23 +194,28 @@ function getSOMembership(entry) {
 
 function getFullAddress(entry, delimiter) {
     var fullAddress = "";
+    var delim = "";
     if (entry.primary_address1) {
-        fullAddress = fullAddress + entry.primary_address1 + delimiter;
+        fullAddress = fullAddress + delim + entry.primary_address1;
+        delim = delimiter;
     }
     if (entry.primary_city) {
-        fullAddress = fullAddress + entry.primary_city + delimiter;
+        fullAddress = fullAddress + delim + entry.primary_city;
+        delim = delimiter;
     }
     if (entry.primary_state) {
-        fullAddress = fullAddress + entry.primary_state + delimiter;
+        fullAddress = fullAddress + delim + entry.primary_state;
+        delim = delimiter;
     }
     if (entry.primary_country_code) {
-        fullAddress = fullAddress + entry.primary_country_code + delimiter;
+        fullAddress = fullAddress + delim + entry.primary_country_code;
+        delim = delimiter;
     }
     if (entry.primary_zip) {
-        fullAddress = fullAddress + entry.primary_zip;
+        fullAddress = fullAddress + delim + entry.primary_zip;
     }
     return fullAddress;
-}
+ }
 
 function getInfoWindow(entry) {
     var details = "<![CDATA[";
