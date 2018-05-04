@@ -1,3 +1,4 @@
+// use browserfy-fs 
 var fs = require('browserify-fs');
 
 var NodeGeocoder = require('node-geocoder');
