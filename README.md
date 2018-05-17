@@ -5,10 +5,11 @@ cd into the nbconverter directory first.
 Install 
     
     npm install
+    npm run build
 
 Usage
 
-    node nbconverter  "your cvs file"
+    npm run run
 
 Output
 
