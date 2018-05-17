@@ -1,3 +1,4 @@
 node_modules/*
 csvdata/*
 apikey.secret*
+dist/*.js
